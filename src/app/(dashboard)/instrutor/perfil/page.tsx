@@ -11,7 +11,7 @@ export default function InstructorProfilePage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
-  // Campos do formulário
+  // Estado dos dados
   const [formData, setFormData] = useState({
     full_name: '',
     detran_number: '',
@@ -19,16 +19,22 @@ export default function InstructorProfilePage() {
     neighborhood: '',
     price_per_class: '',
     phone: '',
-    description: ''
+    description: '',
+    cnh_category: 'B',
+    own_vehicle: true,
+    cnh_url: '',
+    certificate_url: '',
+    vehicle_doc_url: ''
   })
+  
+  const [status, setStatus] = useState('pendente')
 
-  // 1. Ao carregar a tela, busca os dados se já existirem
+  // Carrega dados iniciais
   useEffect(() => {
     const loadData = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return router.push('/login')
 
-      // Busca dados do anúncio deste usuário
       const { data: instructor } = await supabase
         .from('instructors')
         .select('*')
@@ -43,138 +49,186 @@ export default function InstructorProfilePage() {
           neighborhood: instructor.neighborhood || '',
           price_per_class: instructor.price_per_class?.toString() || '',
           phone: instructor.phone || '',
-          description: instructor.description || ''
+          description: instructor.description || '',
+          cnh_category: instructor.cnh_category || 'B',
+          own_vehicle: instructor.own_vehicle,
+          cnh_url: instructor.cnh_url || '',
+          certificate_url: instructor.certificate_url || '',
+          vehicle_doc_url: instructor.vehicle_doc_url || ''
         })
-      } else {
-        // Se não tem anúncio, tenta pegar pelo menos o nome do perfil
-        const { data: profile } = await supabase.from('profiles').select('full_name').single()
-        if (profile) setFormData(prev => ({ ...prev, full_name: profile.full_name || '' }))
+        setStatus(instructor.verification_status || 'pendente')
       }
       setLoading(false)
     }
     loadData()
   }, [supabase, router])
 
-  // 2. Função de Salvar (Criar ou Atualizar)
+  // Função mágica de Upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    if (!e.target.files || e.target.files.length === 0) return
+    const file = e.target.files[0]
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Math.random()}.${fileExt}`
+    const filePath = `${field}/${fileName}`
+
+    setSaving(true)
+    // Sobe para o Storage
+    const { error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(filePath, file)
+
+    if (uploadError) {
+      alert('Erro ao subir arquivo!')
+      setSaving(false)
+      return
+    }
+
+    // Pega a URL pública
+    const { data: { publicUrl } } = supabase.storage
+      .from('documents')
+      .getPublicUrl(filePath)
+
+    // Atualiza o formulário localmente
+    setFormData(prev => ({ ...prev, [field]: publicUrl }))
+    setSaving(false)
+  }
+
+  // Salvar no Banco
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    setMsg(null)
-
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    // Prepara os dados para salvar
     const dataToSave = {
       user_id: user.id,
-      full_name: formData.full_name,
-      detran_number: formData.detran_number,
-      city: formData.city,
-      neighborhood: formData.neighborhood,
+      ...formData,
       price_per_class: parseFloat(formData.price_per_class),
-      phone: formData.phone.replace(/\D/g, ''), // Remove caracteres não numéricos
-      description: formData.description
+      // Sempre que salvar, volta para pendente para o admin revisar as mudanças
+      verification_status: 'pendente' 
     }
 
-    // O comando UPSERT cria se não existe, ou atualiza se já existe (baseado no user_id se tiver constraint, mas aqui vamos buscar pelo ID ou criar novo)
-    // Como nossa tabela não tem constraint unique no user_id por padrão, vamos fazer um check simples:
-    
-    // Primeiro tenta atualizar
-    const { error: updateError, data: updated } = await supabase
-      .from('instructors')
-      .update(dataToSave)
-      .eq('user_id', user.id)
-      .select()
-
-    let error = updateError
-
-    // Se não atualizou nada (porque não existia),então cria
-    if (!error && updated?.length === 0) {
-      const { error: insertError } = await supabase
-        .from('instructors')
-        .insert([dataToSave])
-      error = insertError
-    }
+    const { error } = await supabase.from('instructors').upsert(dataToSave, { onConflict: 'user_id' })
 
     if (error) {
-      setMsg('Erro ao salvar: ' + error.message)
+      setMsg('Erro: ' + error.message)
     } else {
-      setMsg('Sucesso! Seu perfil de instrutor foi atualizado.')
-      router.refresh()
+      setMsg('Dados enviados! Aguarde a verificação da nossa equipe.')
+      setStatus('pendente')
+      window.scrollTo(0,0)
     }
     setSaving(false)
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const value = e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value
+    setFormData({ ...formData, [e.target.name]: value })
   }
 
-  if (loading) return <div className="p-8 text-center">Carregando seus dados...</div>
+  if (loading) return <div className="p-8 text-center">Carregando...</div>
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-        <div className="bg-blue-600 p-6 text-white">
-          <h1 className="text-2xl font-bold">Área do Instrutor</h1>
-          <p className="opacity-90">Preencha os dados abaixo para que os alunos te encontrem.</p>
+      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+        
+        {/* Status Header */}
+        <div className={`${status === 'aprovado' ? 'bg-green-600' : 'bg-yellow-500'} p-6 text-white`}>
+          <h1 className="text-2xl font-bold">Perfil do Instrutor</h1>
+          <p className="font-medium mt-1">
+            Status: {status === 'aprovado' ? 'VERIFICADO E ATIVO ✅' : 'EM ANÁLISE / PENDENTE ⏳'}
+          </p>
         </div>
 
-        <form onSubmit={handleSave} className="p-8 space-y-6">
-          {msg && (
-            <div className={`p-4 rounded-lg text-sm font-medium ${msg.includes('Sucesso') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-              {msg}
-            </div>
-          )}
+        <form onSubmit={handleSave} className="p-8 space-y-8">
+          {msg && <div className="p-4 bg-blue-50 text-blue-700 rounded-lg">{msg}</div>}
 
-          {/* Dados Pessoais */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
-              <input name="full_name" required value={formData.full_name} onChange={handleChange} className="w-full p-2 border rounded-md" />
+          {/* Seção 1: Dados Básicos */}
+          <section>
+            <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4">Dados Profissionais</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-1">Nome Completo</label>
+                <input name="full_name" required value={formData.full_name} onChange={handleChange} className="w-full p-2 border rounded" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Número Credencial (DETRAN)</label>
+                <input name="detran_number" required value={formData.detran_number} onChange={handleChange} className="w-full p-2 border rounded" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Cidade</label>
+                <input name="city" required value={formData.city} onChange={handleChange} className="w-full p-2 border rounded" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Bairro</label>
+                <input name="neighborhood" required value={formData.neighborhood} onChange={handleChange} className="w-full p-2 border rounded" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Preço Aula (R$)</label>
+                <input name="price_per_class" type="number" required value={formData.price_per_class} onChange={handleChange} className="w-full p-2 border rounded" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">WhatsApp</label>
+                <input name="phone" required value={formData.phone} onChange={handleChange} className="w-full p-2 border rounded" />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Credencial (DETRAN)</label>
-              <input name="detran_number" required value={formData.detran_number} onChange={handleChange} placeholder="Ex: 12345-RJ" className="w-full p-2 border rounded-md" />
-            </div>
-          </div>
+          </section>
 
-          {/* Localização e Preço */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
-              <input name="city" required value={formData.city} onChange={handleChange} className="w-full p-2 border rounded-md" />
+          {/* Seção 2: Especificações */}
+          <section>
+            <h3 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4">Detalhes da Aula</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium mb-1">Categoria CNH</label>
+                <select name="cnh_category" value={formData.cnh_category} onChange={handleChange} className="w-full p-2 border rounded">
+                  <option value="A">Moto (A)</option>
+                  <option value="B">Carro (B)</option>
+                  <option value="AB">Carro e Moto (AB)</option>
+                  <option value="D">Ônibus (D)</option>
+                </select>
+              </div>
+              <div className="flex items-center mt-6">
+                <input type="checkbox" name="own_vehicle" checked={formData.own_vehicle} onChange={handleChange} className="w-5 h-5 text-blue-600" />
+                <label className="ml-2 text-gray-700">Possuo Veículo Próprio para Aula</label>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bairro de Atuação</label>
-              <input name="neighborhood" required value={formData.neighborhood} onChange={handleChange} className="w-full p-2 border rounded-md" />
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-1">Sobre você</label>
+              <textarea name="description" rows={3} value={formData.description} onChange={handleChange} className="w-full p-2 border rounded"></textarea>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Preço da Aula (R$)</label>
-              <input name="price_per_class" type="number" required value={formData.price_per_class} onChange={handleChange} placeholder="0.00" className="w-full p-2 border rounded-md" />
+          </section>
+
+          {/* Seção 3: Documentação (Uploads) */}
+          <section className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Documentação Obrigatória</h3>
+            <p className="text-sm text-gray-500 mb-4">Seus documentos não aparecerão publicamente, servem apenas para validação.</p>
+            
+            <div className="space-y-4">
+              {/* Upload CNH */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Foto da CNH Aberta</label>
+                <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFileUpload(e, 'cnh_url')} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                {formData.cnh_url && <span className="text-xs text-green-600 font-bold">Arquivo enviado ✓</span>}
+              </div>
+
+              {/* Upload Credencial */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Credencial de Instrutor</label>
+                <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFileUpload(e, 'certificate_url')} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                {formData.certificate_url && <span className="text-xs text-green-600 font-bold">Arquivo enviado ✓</span>}
+              </div>
+
+              {/* Upload Doc Carro */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Documento do Veículo (CRLV)</label>
+                <input type="file" accept="image/*,application/pdf" onChange={(e) => handleFileUpload(e, 'vehicle_doc_url')} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                {formData.vehicle_doc_url && <span className="text-xs text-green-600 font-bold">Arquivo enviado ✓</span>}
+              </div>
             </div>
-          </div>
+          </section>
 
-          {/* Contato e Descrição */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp (com DDD)</label>
-            <input name="phone" required type="tel" value={formData.phone} onChange={handleChange} placeholder="11 99999-9999" className="w-full p-2 border rounded-md" />
-            <p className="text-xs text-gray-500 mt-1">Os alunos entrarão em contato por este número.</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sobre você e suas aulas</label>
-            <textarea name="description" rows={4} value={formData.description} onChange={handleChange} placeholder="Conte sua experiência, tipo de carro, se busca em casa..." className="w-full p-2 border rounded-md"></textarea>
-          </div>
-
-          <div className="pt-4">
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {saving ? 'Salvando...' : 'Salvar Anúncio'}
-            </button>
-          </div>
+          <button type="submit" disabled={saving} className="w-full bg-blue-600 text-white font-bold py-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-lg">
+            {saving ? 'Enviando...' : 'Salvar e Solicitar Aprovação'}
+          </button>
         </form>
       </div>
     </div>
