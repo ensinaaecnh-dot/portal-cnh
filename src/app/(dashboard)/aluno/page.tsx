@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 
 export default async function AlunoDashboard() {
   const supabase = await createClient()
@@ -77,9 +78,14 @@ export default async function AlunoDashboard() {
                       R$ {inst.price_per_class}
                     </span>
                   </div>
-                  <button className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800">
+                  
+                  {/* AQUI ESTÁ A MUDANÇA: Agora é um LINK para a página de detalhes */}
+                  <Link 
+                    href={`/aluno/instrutor/${inst.id}`}
+                    className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                  >
                     Ver Detalhes
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
