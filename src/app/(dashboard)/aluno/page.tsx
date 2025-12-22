@@ -2,64 +2,65 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
 export default async function AlunoDashboard() {
-  // 1. Conecta no Supabase (Versão Servidor)
   const supabase = await createClient()
 
-  // 2. Verifica quem está logado
+  // 1. Verifica usuario
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
-  // 3. Se não tiver ninguém logado, chuta pro login
-  if (!user) {
-    redirect('/login')
-  }
-
-  // 4. Busca o perfil completo (nome, role, etc)
+  // 2. Busca perfil
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
 
+  // 3. Busca as aulas do banco de dados!
+  const { data: lessons } = await supabase
+    .from('lessons')
+    .select('*')
+    .order('created_at', { ascending: true })
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Barra Superior Simples */}
-      <nav className="bg-white shadow p-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <span className="font-bold text-xl text-blue-600">Portal CNH</span>
-          <div className="text-sm text-gray-600">
-            Logado como: <span className="font-semibold">{profile?.full_name || user.email}</span>
-          </div>
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-blue-600">Portal CNH</h1>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-600">Olá, <strong>{profile?.full_name}</strong></span>
+          <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-bold">
+            {profile?.role?.toUpperCase()}
+          </span>
         </div>
       </nav>
 
-      {/* Conteúdo Principal */}
-      <main className="container mx-auto p-8">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h1 className="text-3xl font-bold mb-4">Painel do Aluno</h1>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="text-blue-800 font-semibold">Status</h3>
-              <p className="text-2xl font-bold text-blue-900">Ativo</p>
-            </div>
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h3 className="text-green-800 font-semibold">Aulas Concluídas</h3>
-              <p className="text-2xl font-bold text-green-900">0 / 20</p>
-            </div>
-            <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-              <h3 className="text-purple-800 font-semibold">Próxima Aula</h3>
-              <p className="text-gray-600">Nenhuma agendada</p>
-            </div>
-          </div>
+      <main className="container mx-auto p-6 max-w-5xl">
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-800">Minhas Aulas</h2>
+          <p className="text-gray-500">Assista aos módulos obrigatórios para liberar sua prova.</p>
+        </div>
 
-          <div className="border-t pt-6">
-            <h2 className="text-xl font-semibold mb-4">Dados da Conta</h2>
-            <ul className="space-y-2 text-gray-700">
-              <li><strong>ID:</strong> {user.id}</li>
-              <li><strong>Email:</strong> {user.email}</li>
-              <li><strong>Perfil:</strong> {profile?.role?.toUpperCase()}</li>
-            </ul>
-          </div>
+        <div className="grid gap-4">
+          {lessons?.map((lesson) => (
+            <div key={lesson.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition">
+              <div>
+                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                  {lesson.module}
+                </span>
+                <h3 className="text-lg font-semibold text-gray-800 mt-2">{lesson.title}</h3>
+                <p className="text-sm text-gray-500">{lesson.description}</p>
+              </div>
+              <div className="text-right">
+                <span className="block text-xs text-gray-400 mb-2">{lesson.duration} min</span>
+                <button className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700">
+                  Assistir
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {lessons?.length === 0 && (
+            <p className="text-center text-gray-500 py-10">Nenhuma aula encontrada.</p>
+          )}
         </div>
       </main>
     </div>
