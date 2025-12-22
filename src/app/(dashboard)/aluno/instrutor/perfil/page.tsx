@@ -88,7 +88,7 @@ export default function InstructorProfilePage() {
 
     let error = updateError
 
-    // Se não atualizou nada (porque não existia), então cria
+    // Se não atualizou nada (porque não existia),então cria
     if (!error && updated?.length === 0) {
       const { error: insertError } = await supabase
         .from('instructors')
