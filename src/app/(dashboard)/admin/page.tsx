@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { checkIsAdmin } from '@/lib/isAdmin'
 import AdminActions from './actions'
+import LogoutButton from '@/components/LogoutButton' // <--- Importado aqui
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -9,7 +10,7 @@ export default async function AdminDashboard() {
   // Verifica se é admin
   const isAdmin = await checkIsAdmin()
 
-  // --- MODO DIAGNÓSTICO (PARA DESCOBRIR O ERRO) ---
+  // --- TELA DE ACESSO NEGADO (COM LOGOUT) ---
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
@@ -26,7 +27,16 @@ export default async function AdminDashboard() {
             </p>
           </div>
 
-          <a href="/" className="text-blue-600 underline hover:text-blue-800">Voltar para Home</a>
+          <div className="flex flex-col gap-3">
+            <a href="/" className="text-blue-600 underline hover:text-blue-800 text-sm">
+              Voltar para Home
+            </a>
+            
+            {/* BOTÃO DE SAIR AQUI */}
+            <div className="border-t pt-3 mt-2">
+              <LogoutButton />
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -43,7 +53,10 @@ export default async function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-800 mb-8">Painel Administrativo</h1>
+        <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-800">Painel Administrativo</h1>
+            <LogoutButton />
+        </div>
         
         {/* Aviso de Debug (Pode remover depois) */}
         <div className="bg-green-100 text-green-800 p-2 text-xs rounded mb-4">
