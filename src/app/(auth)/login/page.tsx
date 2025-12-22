@@ -9,7 +9,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   
   const router = useRouter()
   const supabase = createClient()
@@ -17,21 +17,35 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError(null)
+    setErrorMsg(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    // 1. Tenta logar
+    const { data: { user }, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
-    if (error) {
-      setError('Erro ao entrar. Verifique seu e-mail e senha.')
+    if (error || !user) {
+      setErrorMsg('Email ou senha incorretos.')
       setLoading(false)
-    } else {
-      // Se der certo, manda para o dashboard
-      router.push('/aluno') // Depois ajustaremos para redirecionar conforme o cargo
-      router.refresh()
+      return
     }
+
+    // 2. Login deu certo! Agora vamos ver QUEM é esse usuário (Aluno ou Instrutor?)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    // 3. Redireciona para a casa certa
+    if (profile?.role === 'instrutor') {
+      router.push('/instrutor/perfil') // Vai para edição do anúncio
+    } else {
+      router.push('/aluno') // Vai para busca de aulas
+    }
+    
+    // Obs: Não definimos setLoading(false) aqui porque a página vai mudar
   }
 
   return (
@@ -39,52 +53,41 @@ export default function LoginPage() {
       <div className="w-full max-w-md space-y-8 bg-white p-8 rounded-xl shadow-lg border border-gray-100">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">
-            Portal CNH
+            Acesse sua conta
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Entre na sua conta para continuar
+            Bem-vindo de volta ao Portal CNH
           </p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          {error && (
-            <div className="p-3 text-sm text-red-500 bg-red-50 rounded-lg border border-red-100">
-              {error}
+          {errorMsg && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+              <span className="block sm:inline">{errorMsg}</span>
             </div>
           )}
-
-          <div className="space-y-4">
+          
+          <div className="-space-y-px rounded-md shadow-sm">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                E-mail
-              </label>
+              <label className="sr-only">E-mail</label>
               <input
-                id="email"
-                name="email"
                 type="email"
-                autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                placeholder="seu@email.com"
+                className="relative block w-full rounded-t-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3"
+                placeholder="Endereço de e-mail"
               />
             </div>
-
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Senha
-              </label>
+              <label className="sr-only">Senha</label>
               <input
-                id="password"
-                name="password"
                 type="password"
-                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
-                placeholder="••••••••"
+                className="relative block w-full rounded-b-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 px-3"
+                placeholder="Senha"
               />
             </div>
           </div>
@@ -98,14 +101,11 @@ export default function LoginPage() {
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </div>
-
+          
           <div className="text-center text-sm">
-            <p className="text-gray-500">
-              Ainda não tem conta?{' '}
-              <Link href="/register" className="font-semibold text-blue-600 hover:text-blue-500">
-                Cadastre-se grátis
-              </Link>
-            </p>
+            <Link href="/register" className="font-semibold text-blue-600 hover:text-blue-500">
+              Não tem conta? Cadastre-se
+            </Link>
           </div>
         </form>
       </div>
