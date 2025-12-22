@@ -343,7 +343,7 @@ export default function InstructorProfilePage() {
                 docType="cnh"
                 currentDoc={documents['cnh']}
                 loading={uploadingDoc === 'cnh'}
-                onUpload={(e) => handleFileUpload(e, 'cnh')}
+                onUpload={(e: React.ChangeEvent<HTMLInputElement>) => handleFileUpload(e, 'cnh')}
               />
 
               {/* Card de Upload: Credencial */}
@@ -353,7 +353,7 @@ export default function InstructorProfilePage() {
                 docType="detran_credential"
                 currentDoc={documents['detran_credential']}
                 loading={uploadingDoc === 'detran_credential'}
-                onUpload={(e) => handleFileUpload(e, 'detran_credential')}
+                onUpload={(e: React.ChangeEvent<HTMLInputElement>) => handleFileUpload(e, 'detran_credential')}
               />
 
               {/* Card de Upload: Certificado Curso */}
@@ -363,7 +363,7 @@ export default function InstructorProfilePage() {
                 docType="certificate_instructor"
                 currentDoc={documents['certificate_instructor']}
                 loading={uploadingDoc === 'certificate_instructor'}
-                onUpload={(e) => handleFileUpload(e, 'certificate_instructor')}
+                onUpload={(e: React.ChangeEvent<HTMLInputElement>) => handleFileUpload(e, 'certificate_instructor')}
               />
 
               {/* Card de Upload: CRLV */}
@@ -374,7 +374,7 @@ export default function InstructorProfilePage() {
                   docType="vehicle_crlv"
                   currentDoc={documents['vehicle_crlv']}
                   loading={uploadingDoc === 'vehicle_crlv'}
-                  onUpload={(e) => handleFileUpload(e, 'vehicle_crlv')}
+                  onUpload={(e: React.ChangeEvent<HTMLInputElement>) => handleFileUpload(e, 'vehicle_crlv')}
                 />
               )}
 
