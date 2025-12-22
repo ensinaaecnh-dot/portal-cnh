@@ -29,7 +29,7 @@ export default function LoginPage() {
       setLoading(false)
     } else {
       // Se der certo, manda para o dashboard
-      router.push('/dashboard/aluno') // Depois ajustaremos para redirecionar conforme o cargo
+      router.push('/aluno') // Depois ajustaremos para redirecionar conforme o cargo
       router.refresh()
     }
   }
