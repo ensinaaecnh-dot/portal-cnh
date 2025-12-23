@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import LogoutButton from '@/components/LogoutButton'
+import Link from 'next/link'
 
 export default function InstructorAgenda() {
   const supabase = createClient()
@@ -30,12 +31,14 @@ export default function InstructorAgenda() {
       fetchSlots(inst.id)
     }
     loadAgenda()
-  }, [])
+  }, [router, supabase])
 
   const fetchSlots = async (instId: string) => {
+    // Buscamos os horários e tentamos trazer o e-mail do aluno (join com tabela users é complexo no client, 
+    // então aqui simplificamos trazendo só o ID, mas num app real faríamos uma query mais elaborada)
     const { data } = await supabase
       .from('schedules')
-      .select('*') // Podemos fazer join com student depois para pegar o nome
+      .select('*')
       .eq('instructor_id', instId)
       .order('date_time', { ascending: true })
     
@@ -64,8 +67,12 @@ export default function InstructorAgenda() {
   }
 
   const changeStatus = async (id: string, newStatus: string) => {
-    await supabase.from('schedules').update({ status: newStatus }).eq('id', id)
-    fetchSlots(instructorId!)
+    const { error } = await supabase.from('schedules').update({ status: newStatus }).eq('id', id)
+    if (!error) {
+      fetchSlots(instructorId!)
+    } else {
+      alert('Erro ao atualizar: ' + error.message)
+    }
   }
 
   const deleteSlot = async (id: string) => {
@@ -81,7 +88,7 @@ export default function InstructorAgenda() {
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
         <h1 className="text-xl font-bold text-blue-600">Portal CNH</h1>
         <div className="flex items-center gap-4 text-sm">
-           <a href="/instrutor/perfil" className="text-gray-500 hover:text-blue-600">Meu Perfil</a>
+           <Link href="/instrutor/perfil" className="text-gray-500 hover:text-blue-600">Meu Perfil</Link>
            <span className="text-gray-300">|</span>
            <span className="text-blue-600 font-bold">Minha Agenda</span>
            <span className="text-gray-300">|</span>
@@ -110,12 +117,12 @@ export default function InstructorAgenda() {
           </form>
         </div>
 
-        {/* Lista */}
+        {/* Lista de Horários */}
         <div className="space-y-3">
           {slots.map((slot) => {
             const date = new Date(slot.date_time)
             return (
-              <div key={slot.id} className={`flex justify-between items-center p-4 rounded-lg border ${
+              <div key={slot.id} className={`flex flex-col md:flex-row justify-between items-center p-4 rounded-lg border gap-4 ${
                 slot.status === 'confirmed' ? 'bg-green-50 border-green-200' :
                 slot.status === 'pending' ? 'bg-yellow-50 border-yellow-200' : 'bg-white'
               }`}>
@@ -123,7 +130,7 @@ export default function InstructorAgenda() {
                   <div className="font-bold text-lg text-gray-800">
                     {date.toLocaleDateString('pt-BR')} às {date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
                   </div>
-                  <div className="text-sm">
+                  <div className="text-sm mt-1">
                     {slot.status === 'available' && <span className="text-gray-400">Livre (Ninguém reservou)</span>}
                     {slot.status === 'pending' && <span className="text-yellow-700 font-bold">⚠️ Aluno solicitou reserva!</span>}
                     {slot.status === 'confirmed' && <span className="text-green-700 font-bold">✅ Aula Confirmada</span>}
@@ -131,13 +138,23 @@ export default function InstructorAgenda() {
                 </div>
 
                 <div className="flex gap-2">
+                  {/* Botão de Aceitar (Só aparece se Pendente) */}
                   {slot.status === 'pending' && (
-                    <button onClick={() => changeStatus(slot.id, 'confirmed')} className="bg-green-600 text-white px-3 py-1 rounded text-sm font-bold hover:bg-green-700">
-                      Aceitar
+                    <button onClick={() => changeStatus(slot.id, 'confirmed')} className="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-green-700 shadow-sm">
+                      Aceitar Solicitação
                     </button>
                   )}
+                  
+                  {/* Botão de Chat (Só aparece se Confirmado) */}
+                  {slot.status === 'confirmed' && (
+                    <Link href={`/chat/${slot.id}`} className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-blue-700 flex items-center gap-2 shadow-sm">
+                      💬 Chat com Aluno
+                    </Link>
+                  )}
+
+                  {/* Botão de Remover (Não aparece se já confirmou para evitar problemas) */}
                   {slot.status !== 'confirmed' && (
-                    <button onClick={() => deleteSlot(slot.id)} className="text-red-500 hover:text-red-700 text-sm font-medium px-3">
+                    <button onClick={() => deleteSlot(slot.id)} className="text-red-500 hover:text-red-700 text-sm font-medium px-3 py-2 border border-red-100 rounded hover:bg-red-50">
                       Remover
                     </button>
                   )}
