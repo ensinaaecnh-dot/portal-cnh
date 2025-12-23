@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
+import Link from 'next/link' // <--- Importante
 import SearchBar from '@/components/SearchBar'
-import LogoutButton from '@/components/LogoutButton' // <--- Importado aqui
+import LogoutButton from '@/components/LogoutButton'
 
 export default async function AlunoDashboard({
   searchParams,
@@ -39,14 +39,20 @@ export default async function AlunoDashboard({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* NAVBAR */}
+      
+      {/* NAVBAR ATUALIZADA COM O LINK MINHAS AULAS */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
         <h1 className="text-xl font-bold text-blue-600">Portal CNH</h1>
         
-        {/* ÁREA DO USUÁRIO + LOGOUT */}
         <div className="flex items-center gap-4 text-sm text-gray-600">
-          <span>Olá, <strong>{profile?.full_name}</strong></span>
+          {/* LINK NOVO AQUI 👇 */}
+          <Link href="/aluno/minhas-aulas" className="text-blue-600 font-bold hover:underline">
+            Minhas Aulas
+          </Link>
           <span className="text-gray-300">|</span>
+          
+          <span className="hidden md:inline">Olá, <strong>{profile?.full_name}</strong></span>
+          <span className="hidden md:inline text-gray-300">|</span>
           <LogoutButton />
         </div>
       </nav>
@@ -58,8 +64,8 @@ export default async function AlunoDashboard({
           <div className="flex">
             <div className="ml-3">
               <p className="text-sm text-blue-700">
-                <strong>Dica de Segurança:</strong> Ao encontrar seu instrutor, solicite sempre a apresentação da 
-                Credencial do Detran e a CNH física antes de iniciar a aula prática.
+                <strong>Dica de Segurança:</strong> Nunca faça pagamentos antecipados sem conhecer o instrutor.
+                Utilize o chat para combinar o local de encontro.
               </p>
             </div>
           </div>
