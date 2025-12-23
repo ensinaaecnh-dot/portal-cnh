@@ -9,8 +9,9 @@ export default function ChatWindow({ scheduleId, currentUserId }: { scheduleId: 
   const [newMessage, setNewMessage] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // 1. Carrega mensagens e assina atualizações em tempo real
+  // 1. Carrega mensagens e assina atualizações
   useEffect(() => {
+    // Busca histórico inicial
     const fetchMessages = async () => {
       const { data } = await supabase
         .from('messages')
@@ -20,24 +21,37 @@ export default function ChatWindow({ scheduleId, currentUserId }: { scheduleId: 
       
       if (data) setMessages(data)
     }
-
     fetchMessages()
 
-    // Realtime: Escuta novas mensagens chegando
+    // --- REALTIME (O Segredo do Chat ao Vivo) ---
+    // Criamos um canal ÚNICO para esta aula usando o ID dela
     const channel = supabase
-      .channel('chat-room')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `schedule_id=eq.${scheduleId}` }, 
-      (payload) => {
-        setMessages((prev) => [...prev, payload.new])
-      })
+      .channel(`room-${scheduleId}`) 
+      .on(
+        'postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages', 
+          filter: `schedule_id=eq.${scheduleId}` 
+        }, 
+        (payload) => {
+          // Quando chegar mensagem nova, adiciona na lista
+          console.log('Nova mensagem recebida!', payload.new)
+          setMessages((prev) => [...prev, payload.new])
+        }
+      )
       .subscribe()
 
+    // Limpa a conexão ao sair da tela
     return () => { supabase.removeChannel(channel) }
-  }, [scheduleId])
+  }, [scheduleId, supabase])
 
-  // Rola para baixo sempre que chega mensagem
+  // Rola para baixo sempre que a lista de mensagens mudar
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, 100)
   }, [messages])
 
   // 2. Enviar Mensagem
@@ -45,13 +59,20 @@ export default function ChatWindow({ scheduleId, currentUserId }: { scheduleId: 
     e.preventDefault()
     if (!newMessage.trim()) return
 
+    // Otimista: Limpa o input na hora para parecer rápido
+    const msgTemp = newMessage
+    setNewMessage('')
+
     const { error } = await supabase.from('messages').insert({
       schedule_id: scheduleId,
       sender_id: currentUserId,
-      content: newMessage
+      content: msgTemp
     })
 
-    if (!error) setNewMessage('')
+    if (error) {
+      alert('Erro ao enviar: ' + error.message)
+      setNewMessage(msgTemp) // Devolve o texto se der erro
+    }
   }
 
   return (
@@ -69,7 +90,7 @@ export default function ChatWindow({ scheduleId, currentUserId }: { scheduleId: 
           const isMe = msg.sender_id === currentUserId
           return (
             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[70%] p-3 rounded-xl text-sm ${
+              <div className={`max-w-[70%] p-3 rounded-xl text-sm shadow-sm ${
                 isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
               }`}>
                 {msg.content}
@@ -86,9 +107,9 @@ export default function ChatWindow({ scheduleId, currentUserId }: { scheduleId: 
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Digite sua mensagem..."
-          className="flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+          className="flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all"
         />
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700">
+        <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors">
           Enviar
         </button>
       </form>

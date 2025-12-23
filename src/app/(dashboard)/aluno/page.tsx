@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link' // <--- Importante
+import Link from 'next/link' // <--- Importante para o link funcionar
 import SearchBar from '@/components/SearchBar'
 import LogoutButton from '@/components/LogoutButton'
 
@@ -40,12 +40,12 @@ export default async function AlunoDashboard({
   return (
     <div className="min-h-screen bg-gray-50">
       
-      {/* NAVBAR ATUALIZADA COM O LINK MINHAS AULAS */}
+      {/* NAVBAR COM O LINK MINHAS AULAS */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
         <h1 className="text-xl font-bold text-blue-600">Portal CNH</h1>
         
         <div className="flex items-center gap-4 text-sm text-gray-600">
-          {/* LINK NOVO AQUI 👇 */}
+          {/* O LINK QUE FALTAVA 👇 */}
           <Link href="/aluno/minhas-aulas" className="text-blue-600 font-bold hover:underline">
             Minhas Aulas
           </Link>
@@ -59,7 +59,7 @@ export default async function AlunoDashboard({
 
       <main className="container mx-auto p-6 max-w-5xl">
         
-        {/* AVISO DE RESPONSABILIDADE */}
+        {/* AVISO DE SEGURANÇA */}
         <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-8 rounded-r shadow-sm">
           <div className="flex">
             <div className="ml-3">
