@@ -3,23 +3,26 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import LogoutButton from '@/components/LogoutButton'
 
 export default function InstructorAgenda() {
   const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [slots, setSlots] = useState<any[]>([])
+  
+  // Form de novo horário
   const [newDate, setNewDate] = useState('')
   const [newTime, setNewTime] = useState('')
+  
   const [instructorId, setInstructorId] = useState<string | null>(null)
 
-  // Carrega a agenda
+  // Carrega agenda
   useEffect(() => {
     const loadAgenda = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return router.push('/login')
 
-      // Pega ID do instrutor
       const { data: inst } = await supabase.from('instructors').select('id').eq('user_id', user.id).single()
       if (!inst) return router.push('/instrutor/perfil')
       
@@ -30,25 +33,16 @@ export default function InstructorAgenda() {
   }, [])
 
   const fetchSlots = async (instId: string) => {
-    // Busca horários e os dados do aluno (se houver)
     const { data } = await supabase
       .from('schedules')
-      .select(`
-        *,
-        student:student_id (
-          email
-        )
-      `)
+      .select('*') // Podemos fazer join com student depois para pegar o nome
       .eq('instructor_id', instId)
       .order('date_time', { ascending: true })
     
-    // Obs: Normalmente faríamos um join com a tabela profiles para pegar o nome do aluno, 
-    // mas por simplicidade vamos usar o email ou ajustar depois.
     setSlots(data || [])
     setLoading(false)
   }
 
-  // 1. CRIAR HORÁRIO LIVRE
   const handleAddSlot = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!instructorId || !newDate || !newTime) return
@@ -65,89 +59,93 @@ export default function InstructorAgenda() {
     if (error) alert('Erro: ' + error.message)
     else {
       fetchSlots(instructorId)
-      alert('Horário liberado na agenda!')
+      alert('Horário liberado!')
     }
   }
 
-  // 2. CONFIRMAR AULA
-  const handleConfirm = async (slotId: string) => {
-    const { error } = await supabase
-      .from('schedules')
-      .update({ status: 'confirmed' })
-      .eq('id', slotId)
-
-    if (!error) fetchSlots(instructorId!)
+  const changeStatus = async (id: string, newStatus: string) => {
+    await supabase.from('schedules').update({ status: newStatus }).eq('id', id)
+    fetchSlots(instructorId!)
   }
 
-  // 3. EXCLUIR HORÁRIO
-  const handleDelete = async (slotId: string) => {
-    if(!confirm('Tem certeza?')) return
-    const { error } = await supabase.from('schedules').delete().eq('id', slotId)
-    if (!error) fetchSlots(instructorId!)
+  const deleteSlot = async (id: string) => {
+    if(!confirm('Apagar este horário?')) return
+    await supabase.from('schedules').delete().eq('id', id)
+    fetchSlots(instructorId!)
   }
 
-  if (loading) return <div className="p-8 text-center">Carregando agenda...</div>
+  if (loading) return <div className="p-8 text-center">Carregando...</div>
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Gerenciar Minha Agenda</h1>
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-blue-600">Portal CNH</h1>
+        <div className="flex items-center gap-4 text-sm">
+           <a href="/instrutor/perfil" className="text-gray-500 hover:text-blue-600">Meu Perfil</a>
+           <span className="text-gray-300">|</span>
+           <span className="text-blue-600 font-bold">Minha Agenda</span>
+           <span className="text-gray-300">|</span>
+           <LogoutButton />
+        </div>
+      </nav>
 
-        {/* Formulário de Adicionar */}
+      <div className="max-w-4xl mx-auto p-6">
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">Gerenciar Horários</h1>
+
+        {/* Adicionar Horário */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-8">
-          <h2 className="font-bold text-gray-700 mb-4">Liberar Novo Horário</h2>
+          <h2 className="font-bold text-gray-700 mb-4">Liberar novo horário</h2>
           <form onSubmit={handleAddSlot} className="flex gap-4 items-end">
             <div>
-              <label className="block text-sm text-gray-500 mb-1">Dia</label>
+              <label className="block text-xs font-bold text-gray-500 mb-1">DATA</label>
               <input type="date" required value={newDate} onChange={e => setNewDate(e.target.value)} className="p-2 border rounded" />
             </div>
             <div>
-              <label className="block text-sm text-gray-500 mb-1">Hora</label>
+              <label className="block text-xs font-bold text-gray-500 mb-1">HORA</label>
               <input type="time" required value={newTime} onChange={e => setNewTime(e.target.value)} className="p-2 border rounded" />
             </div>
-            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">
+            <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded font-bold hover:bg-blue-700">
               + Adicionar
             </button>
           </form>
         </div>
 
-        {/* Lista de Agendamentos */}
-        <div className="space-y-4">
-          <h2 className="font-bold text-gray-700">Próximos Horários</h2>
-          {slots.length === 0 && <p className="text-gray-400">Nenhum horário cadastrado.</p>}
-
+        {/* Lista */}
+        <div className="space-y-3">
           {slots.map((slot) => {
             const date = new Date(slot.date_time)
-            const formattedDate = date.toLocaleDateString('pt-BR')
-            const formattedTime = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-
             return (
-              <div key={slot.id} className={`p-4 rounded-lg border flex justify-between items-center ${
-                slot.status === 'confirmed' ? 'bg-green-50 border-green-200' : 
-                slot.status === 'pending' ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-200'
+              <div key={slot.id} className={`flex justify-between items-center p-4 rounded-lg border ${
+                slot.status === 'confirmed' ? 'bg-green-50 border-green-200' :
+                slot.status === 'pending' ? 'bg-yellow-50 border-yellow-200' : 'bg-white'
               }`}>
                 <div>
-                  <div className="font-bold text-lg text-gray-800">{formattedDate} às {formattedTime}</div>
-                  <div className="text-sm mt-1">
-                    {slot.status === 'available' && <span className="text-gray-500">Livre (Aguardando aluno)</span>}
-                    {slot.status === 'pending' && <span className="text-yellow-700 font-bold">Solicitação de Aluno!</span>}
-                    {slot.status === 'confirmed' && <span className="text-green-700 font-bold">Aula Confirmada ✅</span>}
+                  <div className="font-bold text-lg text-gray-800">
+                    {date.toLocaleDateString('pt-BR')} às {date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
+                  </div>
+                  <div className="text-sm">
+                    {slot.status === 'available' && <span className="text-gray-400">Livre (Ninguém reservou)</span>}
+                    {slot.status === 'pending' && <span className="text-yellow-700 font-bold">⚠️ Aluno solicitou reserva!</span>}
+                    {slot.status === 'confirmed' && <span className="text-green-700 font-bold">✅ Aula Confirmada</span>}
                   </div>
                 </div>
 
                 <div className="flex gap-2">
                   {slot.status === 'pending' && (
-                    <button onClick={() => handleConfirm(slot.id)} className="bg-green-600 text-white px-3 py-1 rounded text-sm font-bold hover:bg-green-700">
-                      Aceitar Aula
+                    <button onClick={() => changeStatus(slot.id, 'confirmed')} className="bg-green-600 text-white px-3 py-1 rounded text-sm font-bold hover:bg-green-700">
+                      Aceitar
                     </button>
                   )}
-                  <button onClick={() => handleDelete(slot.id)} className="text-red-500 hover:text-red-700 text-sm font-medium border border-red-100 px-3 py-1 rounded hover:bg-red-50">
-                    {slot.status === 'available' ? 'Remover' : 'Cancelar'}
-                  </button>
+                  {slot.status !== 'confirmed' && (
+                    <button onClick={() => deleteSlot(slot.id)} className="text-red-500 hover:text-red-700 text-sm font-medium px-3">
+                      Remover
+                    </button>
+                  )}
                 </div>
               </div>
             )
           })}
+          {slots.length === 0 && <p className="text-center text-gray-400 py-8">Nenhum horário na sua agenda.</p>}
         </div>
       </div>
     </div>
