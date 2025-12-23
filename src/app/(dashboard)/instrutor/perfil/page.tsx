@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
-import LogoutButton from '@/components/LogoutButton' // <--- 1. Importamos o botão
+import LogoutButton from '@/components/LogoutButton'
+import Link from 'next/link' // <--- Importante para navegação
 
 export default function InstructorProfilePage() {
   const supabase = createClient()
@@ -145,12 +145,17 @@ export default function InstructorProfilePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       
-      {/* 2. NAVBAR DO INSTRUTOR (Igual a do aluno, mas simplificada) */}
+      {/* NAVBAR DO INSTRUTOR COM NAVEGAÇÃO */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
         <h1 className="text-xl font-bold text-blue-600">Portal CNH</h1>
         <div className="flex items-center gap-4 text-sm">
-           <span className="text-gray-600 font-medium hidden md:block">Área do Instrutor</span>
-           <span className="text-gray-300 hidden md:block">|</span>
+           <span className="text-blue-600 font-bold">Meu Perfil</span>
+           <span className="text-gray-300">|</span>
+           {/* Link para a página de Agenda */}
+           <Link href="/instrutor/agenda" className="text-gray-500 hover:text-blue-600 transition-colors">
+             Minha Agenda
+           </Link>
+           <span className="text-gray-300">|</span>
            <LogoutButton />
         </div>
       </nav>
